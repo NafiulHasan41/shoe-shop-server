@@ -38,6 +38,8 @@ const verifyToken = (req, res, next) => {
       
   
         req.user = decoded
+
+        console.log("decoded user", req.user.email)
       
         next()
       })
@@ -107,6 +109,7 @@ async function run() {
           //user operation
           app.post('/users', async (req, res) => {
             const user = req.body;
+           
             // insert email if user doesnt exists: 
             // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
             const query = { email: user.email }
@@ -147,6 +150,21 @@ async function run() {
       
             res.send(result)
           })
+
+            // Get all jobs data count from db
+          app.get('/shoesCount', async (req, res) => {
+            const filter = req.query.filter
+            const shoeSize = req.query.shoeSize
+            const search = req.query.search
+            let query = {
+                title: { $regex: '^' + search, $options: 'i' },
+            }
+            if (filter) query.category = filter
+            if (shoeSize) query.size = shoeSize
+            const count = await shoeCollection.countDocuments(query)
+            console.log('count', count)
+            res.send({ count })
+           })
       
     
 
