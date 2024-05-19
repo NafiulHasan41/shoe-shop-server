@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser')
 require('dotenv').config();
 const formData = require('form-data');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 3000;
 
@@ -28,6 +28,7 @@ app.use(cookieParser())
 
 const verifyToken = (req, res, next) => {
     const token = req.cookies?.token
+    console.log('token', token);
     if (!token) return res.status(401).send({ message: 'unauthorized access' })
     if (token) {
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -73,6 +74,8 @@ async function run() {
 
     const userCollection = client.db("shoeShop").collection("users");
     const shoeCollection = client.db("shoeShop").collection("shoes");
+    const reviewCollection = client.db("shoeShop").collection("reviews");
+    const cartCollection = client.db("shoeShop").collection("carts");
 
 
        // jwt generating
@@ -107,6 +110,8 @@ async function run() {
           })
 
           //user operation
+
+
           app.post('/users', async (req, res) => {
             const user = req.body;
            
@@ -122,10 +127,42 @@ async function run() {
             res.send(result);
           });
 
+          // user cart 
+
+          app.post('/cart', verifyToken, async (req, res) => {
+
+            const cartData = req.body
+            const result = await cartCollection.insertOne(cartData);
+            console.log('cart insert result', result)
+            res.send(result)
+          })
+            // get cart data
+          app.get('/carts',  async (req, res) => {
+
+                const email = req.query.email;
+                
+  
+                const query = { cartEmail: email };
+                const result = await cartCollection.find(query).toArray();
+                res.send(result);
+           
+
+          })
+
+          //carts data delete 
+          app.delete('/carts/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await cartCollection.deleteOne(query);
+            res.send(result);
+          });
+
+
+        //   user section end 
 
    
    
-          //shoe section
+          //shoe section start
           app.get('/shoes', async (req, res) => {
             const size = parseInt(req.query.size)
             const page = parseInt(req.query.page) - 1
@@ -145,13 +182,29 @@ async function run() {
             if (sort) options = { sort: { price: sort === 'asc' ? 1 : -1 } }
             const result = await shoeCollection.find(query, options).skip(page * size).limit(size).toArray()
 
-             
-
-      
+            res.send(result)
+          })
+           
+          // new arrival 
+          app.get('/shoesNewArrival', async (req, res) => {
+          
+            const tag = req.query.tag
+             let query = { tag : tag}
+            const result = await shoeCollection.find(query).toArray()
+            res.send(result)
+          })
+          //single data
+          app.get('/shoeDetails/:id', verifyToken ,  async (req, res) => {
+               
+            const id = req.params.id;
+           
+            const query = { _id: new ObjectId(id) }
+            const result = await shoeCollection.find(query).toArray()
             res.send(result)
           })
 
-            // Get all jobs data count from db
+
+            // Get all shoe data count from db
           app.get('/shoesCount', async (req, res) => {
             const filter = req.query.filter
             const shoeSize = req.query.shoeSize
@@ -165,6 +218,15 @@ async function run() {
             console.log('count', count)
             res.send({ count })
            })
+
+
+
+           //review section 
+           app.post('/reviews', async (req, res) => {
+            const singleJobData = req.body
+            const result = await reviewCollection.insertOne(singleJobData)
+            res.send(result)
+          })
       
     
 
