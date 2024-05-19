@@ -14,8 +14,7 @@ const port = process.env.PORT || 3000;
 
 const corsOptions = {
     origin: [
-      'http://localhost:5173',
-      'http://localhost:5174',
+      'http://localhost:5173'
     ],
     credentials: true,
   }
@@ -26,28 +25,8 @@ app.use(cookieParser())
 
 
 
-const verifyToken = (req, res, next) => {
-    const token = req.cookies?.token
-    console.log('token', token);
-    if (!token) return res.status(401).send({ message: 'unauthorized access' })
-    if (token) {
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-          console.log(err)
-          return res.status(401).send({ message: 'unauthorized access' })
-        }
-      
-  
-        req.user = decoded
 
-        console.log("decoded user", req.user.email)
-      
-        next()
-      })
-    }
-  }
-
-
+    
 
 
 
@@ -77,15 +56,15 @@ async function run() {
     const reviewCollection = client.db("shoeShop").collection("reviews");
     const cartCollection = client.db("shoeShop").collection("carts");
 
-
-       // jwt generating
-       app.post('/jwt', async (req, res) => {
+         // jwt generating
+    app.post('/jwt', async (req, res) => {
         const email = req.body
      
         console.log("email jwt" , email)
         const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
           expiresIn: '2h',
         })
+        console.log("user created token", token)
         res
           .cookie('token', token, {
             httpOnly: true,
@@ -94,6 +73,9 @@ async function run() {
           })
           .send({ success: true })
       })
+
+
+     
 
 
         // Clear  the token when logout
@@ -108,6 +90,62 @@ async function run() {
               })
               .send({ success: true })
           })
+
+
+
+          const verifyToken = (req, res, next) => {
+            const token = req.cookies?.token
+            console.log('verify token', token);
+            if (!token) return res.status(401).send({ message: 'unauthorized access' })
+            if (token) {
+              jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                  console.log(err)
+                  return res.status(401).send({ message: 'unauthorized access' })
+                }
+              
+          
+                req.user = decoded
+        
+                console.log("decoded user", req.user.email)
+              
+                next()
+              })
+            }
+          }
+        
+
+
+
+             // use verify admin after verifyToken
+       const verifyAdmin = async (req, res, next) => {
+        const email = req.user.email;
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const isAdmin = user?.role === 'admin';
+        if (!isAdmin) {
+          return res.status(403).send({ message: 'forbidden access' });
+        }
+        next();
+       }
+
+
+
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+        const email = req.params.email;
+  
+        if (email !== req.user.email) {
+          return res.status(403).send({ message: 'forbidden access' })
+        }
+  
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if (user) {
+          admin = user?.role === 'admin';
+        }
+        res.send({ admin });
+      })
 
           //user operation
 
