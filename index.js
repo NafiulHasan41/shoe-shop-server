@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser')
 require('dotenv').config();
 const formData = require('form-data');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -12,21 +11,10 @@ const port = process.env.PORT || 3000;
 
 //middleware
 
-const corsOptions = {
-    origin: [
-      'http://localhost:5173'
-    ],
-    credentials: true,
-  }
 
-app.use(cors(corsOptions));
+
+app.use(cors());
 app.use(express.json());
-app.use(cookieParser())
-
-
-
-
-    
 
 
 
@@ -57,69 +45,32 @@ async function run() {
     const cartCollection = client.db("shoeShop").collection("carts");
 
          // jwt generating
-    app.post('/jwt', async (req, res) => {
-        const email = req.body
-     
-        console.log("email jwt" , email)
-        const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
-          expiresIn: '2h',
-        })
-        console.log("user created token", token)
-        res
-          .cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-          })
-          .send({ success: true })
-      })
-
-
-     
-
-
-        // Clear  the token when logout
-        app.get('/logout', (req, res) => {
-
-            res
-              .clearCookie('token', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-                maxAge: 0,
-              })
-              .send({ success: true })
+         app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '2h' });
+            res.send({ token });
           })
 
 
-
-          const verifyToken = (req, res, next) => {
-            const token = req.cookies?.token
-            console.log('verify token', token);
-            if (!token) return res.status(401).send({ message: 'unauthorized access' })
-            if (token) {
-              jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-                if (err) {
-                  console.log(err)
-                  return res.status(401).send({ message: 'unauthorized access' })
-                }
-              
-          
-                req.user = decoded
-        
-                console.log("decoded user", req.user.email)
-              
-                next()
-              })
-            }
+         // middlewares 
+    const verifyToken = (req, res, next) => {
+        // console.log('inside verify token', req.headers.authorization);
+        if (!req.headers.authorization) {
+          return res.status(401).send({ message: 'unauthorized access' });
+        }
+        const token = req.headers.authorization.split(' ')[1];
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+          if (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
           }
-        
-
-
-
+          req.decoded = decoded;
+          next();
+        })
+      }
+    
              // use verify admin after verifyToken
        const verifyAdmin = async (req, res, next) => {
-        const email = req.user.email;
+        const email = req.decoded.email;
         const query = { email: email };
         const user = await userCollection.findOne(query);
         const isAdmin = user?.role === 'admin';
@@ -131,10 +82,10 @@ async function run() {
 
 
 
-    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+    app.get('/users/admin/:email',verifyToken,  async (req, res) => {
         const email = req.params.email;
   
-        if (email !== req.user.email) {
+        if (email !== req.decoded.email) {
           return res.status(403).send({ message: 'forbidden access' })
         }
   
@@ -167,13 +118,14 @@ async function run() {
 
           // user cart 
 
-          app.post('/cart', verifyToken, async (req, res) => {
+          app.post('/cart',  async (req, res) => {
 
             const cartData = req.body
             const result = await cartCollection.insertOne(cartData);
             console.log('cart insert result', result)
             res.send(result)
           })
+
             // get cart data
           app.get('/carts',  async (req, res) => {
 
@@ -256,6 +208,14 @@ async function run() {
             console.log('count', count)
             res.send({ count })
            })
+           //adding shoes 
+           app.post('/shoes', verifyToken, verifyAdmin, async (req, res) => {
+            const item = req.body;
+            const result = await shoeCollection.insertOne(item);
+            res.send(result);
+          });
+
+
 
 
 
