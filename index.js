@@ -148,6 +148,41 @@ async function run() {
           });
 
 
+           // users related api from admin
+            app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+           const result = await userCollection.find().toArray();
+             res.send(result);
+             });
+
+
+
+             //making admin from user 
+             app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+                const id = req.params.id;
+                const filter = { _id: new ObjectId(id) };
+                const updatedDoc = {
+                  $set: {
+                    role: 'admin'
+                  }
+                }
+                const result = await userCollection.updateOne(filter, updatedDoc);
+                res.send(result);
+              })
+
+              //deleting the user though it may not delete from firebase
+
+              app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) }
+                const result = await userCollection.deleteOne(query);
+                res.send(result);
+              })
+
+          
+
+            
+
+
         //   user section end 
 
    
@@ -256,6 +291,10 @@ async function run() {
 
 
 
+          
+
+
+
 
 
            //review section 
@@ -263,6 +302,12 @@ async function run() {
             const singleJobData = req.body
             const result = await reviewCollection.insertOne(singleJobData)
             res.send(result)
+          })
+          app.get('/reviews', async (req, res) => {
+
+            const result = await reviewCollection.find().toArray()
+            res.send(result)
+            
           })
       
     
